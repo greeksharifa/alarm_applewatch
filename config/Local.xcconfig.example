@@ -1,0 +1,7 @@
+// Copy this file to config/Local.xcconfig. The copied file is ignored by git.
+// Fill these values only on your local machine.
+
+APPLE_DEVELOPMENT_TEAM =
+APP_BUNDLE_ID_PREFIX = com.example.alarm-applewatch
+IOS_APP_BUNDLE_ID = $(APP_BUNDLE_ID_PREFIX)
+WATCH_APP_BUNDLE_ID = $(APP_BUNDLE_ID_PREFIX).watchkitapp
