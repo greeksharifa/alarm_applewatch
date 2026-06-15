@@ -17,7 +17,7 @@ struct ContentView: View {
                     .font(.headline)
 
                 Toggle(
-                    "Aggressive Mode",
+                    "Morning Guard",
                     isOn: Binding(
                         get: { guardController.isAggressiveModeEnabled },
                         set: { guardController.setAggressiveModeEnabled($0) }

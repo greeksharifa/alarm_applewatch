@@ -4,6 +4,7 @@ import WatchKit
 @MainActor
 final class SmartAlarmBridge: NSObject, WKExtendedRuntimeSessionDelegate {
     private var session: WKExtendedRuntimeSession?
+    private var invalidatingSessions: [ObjectIdentifier: WKExtendedRuntimeSession] = [:]
     private let onEvent: (String) -> Void
 
     init(onEvent: @escaping (String) -> Void = { _ in }) {
@@ -22,7 +23,11 @@ final class SmartAlarmBridge: NSObject, WKExtendedRuntimeSessionDelegate {
             return
         }
 
-        session?.invalidate()
+        if let session {
+            invalidatingSessions[ObjectIdentifier(session)] = session
+            session.invalidate()
+        }
+
         let nextSession = WKExtendedRuntimeSession()
         nextSession.delegate = self
         nextSession.start(at: date)
@@ -42,31 +47,48 @@ final class SmartAlarmBridge: NSObject, WKExtendedRuntimeSessionDelegate {
     }
 
     nonisolated func extendedRuntimeSessionDidStart(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
+        let sessionID = ObjectIdentifier(extendedRuntimeSession)
         Task { @MainActor [weak self] in
-            self?.handleSessionDidStart()
+            self?.handleSessionDidStart(sessionID: sessionID)
         }
     }
 
     nonisolated func extendedRuntimeSessionWillExpire(_ extendedRuntimeSession: WKExtendedRuntimeSession) {}
 
     nonisolated func extendedRuntimeSession(_ extendedRuntimeSession: WKExtendedRuntimeSession, didInvalidateWith reason: WKExtendedRuntimeSessionInvalidationReason, error: Error?) {
+        let sessionID = ObjectIdentifier(extendedRuntimeSession)
         let reasonDescription = String(describing: reason)
         let errorDescription = error?.localizedDescription
 
         Task { @MainActor [weak self] in
-            self?.handleSessionInvalidation(reasonDescription: reasonDescription, errorDescription: errorDescription)
+            self?.handleSessionInvalidation(
+                sessionID: sessionID,
+                reasonDescription: reasonDescription,
+                errorDescription: errorDescription
+            )
         }
     }
 
-    private func handleSessionDidStart() {
+    private func handleSessionDidStart(sessionID: ObjectIdentifier) {
+        guard let session, ObjectIdentifier(session) == sessionID else {
+            return
+        }
+
         AlarmDebugConsole.write("smart alarm bridge started")
         notifyRunningSessionIfPossible()
     }
 
-    private func handleSessionInvalidation(reasonDescription: String, errorDescription: String?) {
-        if session?.state == .invalid {
+    private func handleSessionInvalidation(
+        sessionID: ObjectIdentifier,
+        reasonDescription: String,
+        errorDescription: String?
+    ) {
+        invalidatingSessions.removeValue(forKey: sessionID)
+
+        if let currentSession = session, ObjectIdentifier(currentSession) == sessionID {
             session = nil
         }
+
         let detail = errorDescription.map { ": \($0)" } ?? ""
         AlarmDebugConsole.write("smart alarm bridge invalidated reason=\(reasonDescription)\(detail)")
         onEvent("Smart Alarm bridge invalidated (\(reasonDescription))\(detail)")

@@ -38,6 +38,7 @@ public struct AlarmPhase: Identifiable, Equatable, Sendable {
 
 public struct AlarmConfiguration: Equatable, Sendable {
     private static let shortDiagnosticOffsetsAndDurations = [(10, 2), (30, 5), (60, 10)]
+    private static let wakeWindowDiagnosticOffsetsAndDurations = [(120, 2), (150, 5), (180, 10)]
 
     public let phases: [AlarmPhase]
 
@@ -59,6 +60,10 @@ public struct AlarmConfiguration: Equatable, Sendable {
 
     public static func simulatorDiagnostic(startingAt date: Date, calendar: Calendar = .current) -> AlarmConfiguration {
         diagnostic(startingAt: date, offsetsAndDurations: shortDiagnosticOffsetsAndDurations, calendar: calendar)
+    }
+
+    public static func simulatorWakeWindowDiagnostic(startingAt date: Date, calendar: Calendar = .current) -> AlarmConfiguration {
+        diagnostic(startingAt: date, offsetsAndDurations: wakeWindowDiagnosticOffsetsAndDurations, calendar: calendar)
     }
 
     public static func deviceDiagnostic(startingAt date: Date, calendar: Calendar = .current) -> AlarmConfiguration {

@@ -91,6 +91,43 @@ import Testing
     #expect(configuration.phases.map(\.durationSeconds) == [2, 5, 10])
 }
 
+@Test func simulatorWakeWindowDiagnosticSchedulesAlarmsMinutesAfterLaunch() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+    let start = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 1, minute: 20, second: 10)))
+
+    let configuration = AlarmConfiguration.simulatorWakeWindowDiagnostic(startingAt: start, calendar: calendar)
+    let calculator = AlarmScheduleCalculator(configuration: configuration, calendar: calendar)
+    let phases = calculator.scheduledPhases(onDayContaining: start)
+
+    #expect(phases.map(\.startDate) == [
+        try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 1, minute: 22, second: 10))),
+        try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 1, minute: 22, second: 40))),
+        try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 1, minute: 23, second: 10)))
+    ])
+    #expect(configuration.phases.map(\.durationSeconds) == [2, 5, 10])
+}
+
+@Test func simulatorWakeWindowDiagnosticStartsGuardBeforeFirstAlarm() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+    let start = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 1, minute: 20, second: 10)))
+    let configuration = AlarmConfiguration.simulatorWakeWindowDiagnostic(startingAt: start, calendar: calendar)
+    let policy = AlarmGuardWindowPolicy(
+        configuration: configuration,
+        prewarmSeconds: 60,
+        cooldownSeconds: 30,
+        calendar: calendar
+    )
+
+    let window = try #require(policy.currentOrNextWindow(at: start))
+    let expectedStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 1, minute: 21, second: 10)))
+    let expectedEnd = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 1, minute: 23, second: 50)))
+
+    #expect(window.startDate == expectedStart)
+    #expect(window.endDate == expectedEnd)
+}
+
 @Test func deviceDiagnosticConfigurationUsesShortCurrentTimeOffsetsForPhysicalTesting() throws {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
@@ -149,4 +186,66 @@ import Testing
     ])
     #expect(plan.descriptors.map(\.hour) == [7, 7, 8])
     #expect(plan.descriptors.map(\.minute) == [40, 50, 0])
+}
+
+@Test func guardWindowStartsBeforeFirstAlarmAndEndsAfterLastAlarm() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+    let date = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 1)))
+    let policy = AlarmGuardWindowPolicy(
+        configuration: .fixedDaily,
+        prewarmSeconds: 300,
+        cooldownSeconds: 60,
+        calendar: calendar
+    )
+
+    let window = try #require(policy.window(onDayContaining: date))
+    let expectedStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 7, minute: 35)))
+    let expectedEnd = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 8, minute: 6)))
+
+    #expect(window.startDate == expectedStart)
+    #expect(window.endDate == expectedEnd)
+}
+
+@Test func guardWindowPolicyReturnsCurrentWindowOnlyInsideMorningRange() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+    let policy = AlarmGuardWindowPolicy(configuration: .fixedDaily, calendar: calendar)
+    let night = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 2)))
+    let inside = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 7, minute: 36)))
+    let after = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 8, minute: 6)))
+    let expectedStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 7, minute: 35)))
+
+    #expect(policy.currentWindow(at: night) == nil)
+    #expect(policy.currentWindow(at: inside)?.startDate == expectedStart)
+    #expect(policy.currentWindow(at: after) == nil)
+}
+
+@Test func guardWindowPolicyReturnsNextWindowWithoutKeepingWorkoutAliveOvernight() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 9 * 3600)!
+    let policy = AlarmGuardWindowPolicy(configuration: .fixedDaily, calendar: calendar)
+    let previousNight = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 2)))
+    let afterMorning = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 9)))
+
+    let todayWindow = try #require(policy.currentOrNextWindow(at: previousNight))
+    let tomorrowWindow = try #require(policy.currentOrNextWindow(at: afterMorning))
+    let expectedTodayStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 14, hour: 7, minute: 35)))
+    let expectedTomorrowStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 15, hour: 7, minute: 35)))
+
+    #expect(todayWindow.startDate == expectedTodayStart)
+    #expect(tomorrowWindow.startDate == expectedTomorrowStart)
+}
+
+@Test func aggressiveModeDefaultsOnWhenNoStoredPreferenceExists() {
+    #expect(AggressiveModePreference.resolve(storedValue: nil, forceEnabled: false) == true)
+}
+
+@Test func aggressiveModeRespectsExplicitStoredPreference() {
+    #expect(AggressiveModePreference.resolve(storedValue: false, forceEnabled: false) == false)
+    #expect(AggressiveModePreference.resolve(storedValue: true, forceEnabled: false) == true)
+}
+
+@Test func aggressiveModeForceEnabledOverridesStoredPreference() {
+    #expect(AggressiveModePreference.resolve(storedValue: false, forceEnabled: true) == true)
 }

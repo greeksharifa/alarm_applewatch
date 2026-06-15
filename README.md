@@ -2,12 +2,12 @@
 
 Personal Apple Watch alarm app focused on reliable watch-local haptic alarms, fallback notifications, and physical-device validation.
 
-The fixed daily schedule is 07:40 for 5 seconds, 07:50 for 20 seconds, and 08:00 for 300 seconds. Debug builds also support short diagnostic schedules for simulator and physical Watch validation.
+The fixed daily schedule is 07:40 for 5 seconds, 07:50 for 20 seconds, and 08:00 for 300 seconds. The Watch app arms a Morning Guard window from 07:35 through 08:06 local time: the HealthKit workout anchor is kept off outside that window, then started inside the window to maximize haptic delivery through Sleep Focus or Do Not Disturb. Debug builds also support short diagnostic schedules for simulator and physical Watch validation.
 
 ## Project Map
 
 - `alarm_applewatch Watch App/`: watchOS app source, UI, haptics, battery monitoring, notifications, and HealthKit workout anchoring.
-- `alarm_applewatch Watch App/AlarmCore/`: pure alarm configuration, scheduling, notification plan, haptic pulse plan, and battery stop policy.
+- `alarm_applewatch Watch App/AlarmCore/`: pure alarm configuration, scheduling, guard-window policy, notification plan, haptic pulse plan, and battery stop policy.
 - `alarm_applewatch/`: companion iOS app shell.
 - `Tests/AlarmCoreTests/`: Swift Testing coverage for deterministic alarm core behavior.
 - `scripts/`: simulator and physical-device verification helpers.
@@ -19,6 +19,7 @@ The fixed daily schedule is 07:40 for 5 seconds, 07:50 for 20 seconds, and 08:00
 swift test
 xcodebuild -project alarm_applewatch.xcodeproj -scheme "alarm_applewatch Watch App" -destination "generic/platform=watchOS Simulator" CODE_SIGNING_ALLOWED=NO build
 WATCH_UDID=<sim-udid> scripts/verify_watch_simulator.sh
+WATCH_UDID=<sim-udid> bash scripts/verify_watch_simulator_wake_window.sh
 bash scripts/check_real_watch_device.sh
 WATCH_DEVICE=<watch-id> IOS_DESTINATION_ID=<iphone-id> scripts/run_watch_charger_stop_test.sh
 ```

@@ -10,13 +10,14 @@ The implementation is in place and validated through physical Apple Watch consol
 
 Current evidence:
 - Fixed schedule implemented: 07:40 for 5s, 07:50 for 20s, 08:00 for 300s.
-- `AlarmGuardController` starts or recovers a long-lived `HKWorkoutSession` while Aggressive Mode is enabled.
+- `AlarmGuardController` starts or recovers `HKWorkoutSession` only inside the Morning Guard window. For the fixed morning schedule, that window is 07:35 through 08:06 local time.
 - `HapticPhaseRunner` drives repeated `WKInterfaceDevice.play(.notification)` calls for each phase.
 - `BatteryStopMonitor` cancels the current phase when Watch reports `.charging` or `.full`.
-- `LongTermNotificationScheduler` registers three repeating daily fallback notifications.
+- `LongTermNotificationScheduler` registers three repeating daily silent fallback notifications. They intentionally avoid the Time Sensitive Notifications entitlement because personal development teams cannot provision it.
 - `SmartAlarmBridge` schedules best-effort extended runtime sessions only while the app is active and the start date is within 36 hours.
-- Minimal Watch UI exposes Aggressive Mode and status only; it does not expose stop, snooze, cancel, or schedule editing.
+- Minimal Watch UI exposes Morning Guard and status only; it does not expose stop, snooze, cancel, or schedule editing.
 - `WatchAppInfo.plist` includes HealthKit usage descriptions and `WKBackgroundModes = [workout-processing, alarm]`.
+- Watch entitlements include HealthKit.
 - `plutil -lint WatchAppInfo.plist` passed.
 - `SWIFTPM_CACHE_PATH=.build/swiftpm-cache CLANG_MODULE_CACHE_PATH=.build/module-cache swift test --disable-sandbox --scratch-path .build` passed 12 tests.
 - `xcodebuild -quiet -project alarm_applewatch.xcodeproj -scheme 'alarm_applewatch Watch App' -destination 'generic/platform=watchOS' -derivedDataPath .build/DerivedData-FinalDevice CODE_SIGNING_ALLOWED=NO build` passed.
@@ -48,6 +49,10 @@ Current evidence:
 - Direct physical Watch validation after that fix recorded `fallback notification removed obsolete diagnostic ids=4`, then scheduled `alarm_applewatch.daily.first` at 07:40, `alarm_applewatch.daily.second` at 07:50, and `alarm_applewatch.daily.third` at 08:00 during a Debug diagnostic launch.
 - Smart Alarm bridge Info.plist mode was corrected from the invalid `smart-alarm` string to Apple's `alarm` `WKBackgroundModes` value. In the devicectl-launched validation context, `WKExtendedRuntimeSession` still invalidated because scheduling must happen while the app is active and before `applicationWillResignActive`; the workout anchor remains the primary background execution path and local notifications remain the validated fallback.
 - The Watch UI now includes a `Test Haptics` button that immediately runs the same 2/5/10-pulse, one-pulse-per-second sequence used by diagnostic testing, with no stop/snooze/cancel control added.
+- Morning Guard window policy is covered by SwiftPM tests: the fixed schedule starts the guard at 07:35, ends it at 08:06, returns no active window at night, and schedules the next window without keeping the workout anchor alive overnight.
+- Simulator wake-window test mode is implemented behind `WAKE_GUARD_WINDOW_DIAGNOSTIC_MODE=1`: launch schedules guard prewake at `launch + 60s` and diagnostic phases at `launch + 120s`, `+150s`, and `+180s`.
+- Xcode UI simulator run on Apple Watch SE 3 (44mm), after granting Health access, recorded `schedule=18:48:54 2s | 18:49:24 5s | 18:49:54 10s`, `guard armed window_start=18:47:54 window_end=18:50:34`, `phase ended phase=diagnostic-1 pulses=2`, `phase ended phase=diagnostic-2 pulses=5`, `phase ended phase=diagnostic-3 pulses=10`, then `workout anchor stop requested` and `workout session state=3`.
+- Physical Watch Release install on 2026-06-16 succeeded after removing the unsupported Time Sensitive Notifications entitlement for the personal development team. `devicectl` installed the locally configured `WATCH_APP_BUNDLE_ID` to the target physical Watch; a post-install app query showed the new installation URL, and a launch check started the app.
 
 Pending evidence before close:
 - Tactile confirmation from the wearer that the diagnostic and morning-schedule haptics are felt for the expected windows.
@@ -55,7 +60,7 @@ Pending evidence before close:
 
 ## What Remains
 
-- Grant HealthKit and notification permissions, enable Aggressive Mode if needed, and observe the next alarm windows.
+- Grant HealthKit and notification permissions, enable Morning Guard if needed, and observe the next alarm windows.
 - Use the Debug physical-device diagnostic schedule for quick haptic smoke tests before waiting for the morning schedule.
 - Confirm whether the wearer felt the physical haptic pulses during diagnostic runs.
 - Decide whether Smart Alarm bridge should remain best-effort or be promoted into a required closure gate.

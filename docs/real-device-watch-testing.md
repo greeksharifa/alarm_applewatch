@@ -103,7 +103,17 @@ If the Watch is listed as ineligible, confirm the Watch is running watchOS 26.5 
 2. Wait for the app to install and launch on Apple Watch.
 3. Grant HealthKit permission when prompted.
 4. Grant notification permission when prompted.
-5. Enable Aggressive Mode in the Watch app UI.
+5. Confirm Morning Guard is on in the Watch app UI. First launch defaults it on; explicitly turning it off persists that off state.
+
+## Morning Guard Window
+
+Morning Guard is not a full-night keep-alive mode. For the fixed morning schedule, the Watch app keeps the HealthKit workout anchor off outside the local-time guard window, then starts or recovers it only inside this range:
+
+- Guard starts: `07:35`.
+- Guard ends: `08:06`.
+- Alarm phases inside the window: `07:40` for 5 seconds, `07:50` for 20 seconds, and `08:00` for 300 seconds.
+
+This preserves the aggressive haptic path during the morning alarm window while avoiding a forced workout session during the rest of Sleep Focus or Do Not Disturb hours. The repeating fallback notifications are silent normal notifications because personal development teams do not support the Time Sensitive Notifications entitlement; they are a recovery layer, not the primary haptic loop.
 
 ## Debug Diagnostic Schedule
 
@@ -122,6 +132,26 @@ This diagnostic schedule is for test runs only. The real app schedule remains th
 - `08:00`: haptics for 300 seconds.
 
 To test the real morning schedule from a Debug build, launch with `WAKE_GUARD_PRODUCTION_SCHEDULE=1` or use a non-Debug build.
+
+## Simulator Wake-Window Diagnostic
+
+Use `WAKE_GUARD_WINDOW_DIAGNOSTIC_MODE=1` when the specific behavior under test is "wake the guard shortly before a later alarm." This mode keeps the same 2/5/10 pulse pattern but moves the alarms a few minutes after launch:
+
+- Guard prewake: `launch + 60s`.
+- `launch + 120s`: 2 haptic pulses over 2 seconds.
+- `launch + 150s`: 5 haptic pulses over 5 seconds.
+- `launch + 180s`: 10 haptic pulses over 10 seconds.
+- Guard cooldown ends at approximately `launch + 220s`.
+
+The repeatable simulator command path is:
+
+```sh
+WATCH_UDID=<sim-udid> bash scripts/verify_watch_simulator_wake_window.sh
+```
+
+Expected log evidence includes `guard armed window_start=...` before the first phase, the three diagnostic phase start/end records, the tenth pulse in `diagnostic-3`, and `workout anchor stop requested` plus `workout session state=3` after the guard window completes. This validates the app's scheduled prewake loop and confirms the workout anchor is released after the diagnostic window. It does not prove that watchOS will relaunch a terminated app; that still requires physical Watch validation with Smart Alarm/fallback behavior.
+
+If the simulator shows a Health Access prompt, approve it before the guard prewake time. Otherwise the workout anchor authorization request can block the phase loop before haptics begin. This is expected on a fresh simulator that has not previously granted HealthKit access.
 
 ## Manual Haptic Test Button
 
@@ -160,6 +190,7 @@ Physical Watch validation must cover these cases:
 - 07:40 alarm runs haptics for 5 seconds.
 - 07:50 alarm runs haptics for 20 seconds.
 - 08:00 alarm keeps attempting haptics for 300 seconds.
+- Outside `07:35` through `08:06`, the workout anchor returns to off/idle instead of staying active through Sleep Focus hours.
 - Pressing Home/Digital Crown during an active phase does not immediately stop the phase while the workout anchor remains valid.
 - Placing the Watch on a charger stops the active phase within the battery polling window.
 - Local fallback notifications remain scheduled after app relaunch or Watch restart.

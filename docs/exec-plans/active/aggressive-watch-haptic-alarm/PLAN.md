@@ -14,7 +14,7 @@ Linked docs:
 
 In scope:
 - Fixed daily alarms at 07:40 for 5s, 07:50 for 20s, and 08:00 for 300s.
-- Watch-local aggressive haptics anchored by `HKWorkoutSession`.
+- Watch-local aggressive haptics anchored by `HKWorkoutSession` only during the morning guard window.
 - Local notification fallback for alarm delivery.
 - Smart Alarm bridge only when Smart Alarm is active.
 - Minimal UI for setup/status only.
@@ -53,11 +53,12 @@ Relationships:
 
 ### Slice 2: Workout-Anchored Haptic Runner
 
-Outcome: alarm haptics run through a watch-local path kept active by a long-lived `HKWorkoutSession` while Aggressive Mode is enabled.
+Outcome: alarm haptics run through a watch-local path kept active by `HKWorkoutSession` only during the Morning Guard window.
 
 Acceptance criteria:
 - Workout authorization/session lifecycle is handled.
-- Aggressive Mode starts or recovers the workout anchor before waiting for the next alarm window.
+- Morning Guard starts or recovers the workout anchor inside the local-time guard window and stops it outside that window.
+- For the fixed morning schedule, the guard window is 07:35 through 08:06.
 - Long 08:00 alarm continues attempting haptics for the full 300s window.
 
 Evaluation backing:

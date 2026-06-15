@@ -17,6 +17,8 @@ final class WorkoutBackgroundAnchor: NSObject, ObservableObject {
     private let healthStore = HKHealthStore()
     private var session: HKWorkoutSession?
     private var builder: HKLiveWorkoutBuilder?
+    private var endingSessions: [HKWorkoutSession] = []
+    private var endingBuilders: [HKLiveWorkoutBuilder] = []
 
     var statusText: String {
         switch state {
@@ -57,13 +59,37 @@ final class WorkoutBackgroundAnchor: NSObject, ObservableObject {
     }
 
     func stop() {
-        session?.end()
-        builder?.endCollection(withEnd: Date()) { [builder] _, _ in
-            builder?.discardWorkout()
+        let sessionToEnd = session
+        let builderToEnd = builder
+        let shouldLogStop = sessionToEnd != nil || builderToEnd != nil || state == .running
+
+        if shouldLogStop {
+            AlarmLog.runtime.info("workout anchor stop requested")
+            AlarmDebugConsole.write("workout anchor stop requested")
         }
+
+        if let sessionToEnd {
+            endingSessions.append(sessionToEnd)
+            sessionToEnd.end()
+        }
+
+        if let builderToEnd {
+            endingBuilders.append(builderToEnd)
+            builderToEnd.endCollection(withEnd: Date()) { [weak self, builderToEnd] _, _ in
+                builderToEnd.discardWorkout()
+                Task { @MainActor in
+                    self?.endingBuilders.removeAll { $0 === builderToEnd }
+                }
+            }
+        }
+
         session = nil
         builder = nil
         state = .idle
+
+        if shouldLogStop {
+            AlarmDebugConsole.write("workout anchor state=idle")
+        }
     }
 
     private func requestAuthorizationAndStart() async {
@@ -145,7 +171,9 @@ extension WorkoutBackgroundAnchor: HKWorkoutSessionDelegate {
                 state = .running
                 AlarmDebugConsole.write("workout session state=running")
             } else if toState == .ended || toState == .stopped {
+                endingSessions.removeAll { $0 === workoutSession }
                 state = .idle
+                AlarmLog.runtime.info("workout session ended state=\(toState.rawValue)")
                 AlarmDebugConsole.write("workout session state=\(toState.rawValue)")
             }
         }

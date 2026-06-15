@@ -42,14 +42,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		77A379002FDDBA5A00AE2990 /* alarm_applewatch */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = alarm_applewatch;
-			sourceTree = "<group>";
-		};
 		77A378DA2FDDAFED00AE2990 /* alarm_applewatch Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "alarm_applewatch Watch App";
+			sourceTree = "<group>";
+		};
+		77A379002FDDBA5A00AE2990 /* alarm_applewatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = alarm_applewatch;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -197,14 +197,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		77A379012FDDBA5A00AE2990 /* Sources */ = {
+		77A378D22FDDAFED00AE2990 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		77A378D22FDDAFED00AE2990 /* Sources */ = {
+		77A379012FDDBA5A00AE2990 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -416,9 +416,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = alarm_applewatch;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_APP_BUNDLE_ID)";
@@ -444,9 +444,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = alarm_applewatch;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(IOS_APP_BUNDLE_ID)";

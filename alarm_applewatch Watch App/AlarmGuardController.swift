@@ -30,21 +30,51 @@ final class AlarmGuardController: ObservableObject {
     private var calendar = Calendar.current
 
     private let enabledKey = "AggressiveModeEnabled"
+    private let guardWindowPrewarmSeconds: Int
+    private let guardWindowCooldownSeconds: Int
 
     private init() {
         let environment = ProcessInfo.processInfo.environment
         let chargerTestMode = AlarmGuardController.shouldRunChargerTestMode(environment: environment)
+        let wakeWindowDiagnosticMode = AlarmGuardController.shouldRunWakeWindowDiagnosticMode(environment: environment)
         let diagnosticMode = AlarmGuardController.shouldRunDiagnosticMode(environment: environment)
+        let forceEnabled = chargerTestMode || wakeWindowDiagnosticMode || diagnosticMode
+        let storedAggressiveModePreference = UserDefaults.standard.object(forKey: enabledKey) as? Bool
         if chargerTestMode {
             configuration = AlarmConfiguration.chargerDiagnostic(startingAt: Date())
+            guardWindowPrewarmSeconds = 300
+            guardWindowCooldownSeconds = 60
+        } else if wakeWindowDiagnosticMode {
+            configuration = AlarmConfiguration.simulatorWakeWindowDiagnostic(startingAt: Date())
+            guardWindowPrewarmSeconds = 60
+            guardWindowCooldownSeconds = 30
         } else if diagnosticMode {
             configuration = AlarmConfiguration.deviceDiagnostic(startingAt: Date())
+            guardWindowPrewarmSeconds = 300
+            guardWindowCooldownSeconds = 60
         } else {
             configuration = .fixedDaily
+            guardWindowPrewarmSeconds = 300
+            guardWindowCooldownSeconds = 60
         }
         scheduleText = AlarmGuardController.scheduleSummary(for: configuration)
-        isAggressiveModeEnabled = chargerTestMode || diagnosticMode || UserDefaults.standard.bool(forKey: enabledKey)
-        lastEventText = chargerTestMode ? "Charger test ready" : (diagnosticMode ? "Diagnostic mode ready" : "Ready")
+        let resolvedAggressiveModeEnabled = AggressiveModePreference.resolve(
+            storedValue: storedAggressiveModePreference,
+            forceEnabled: forceEnabled
+        )
+        isAggressiveModeEnabled = resolvedAggressiveModeEnabled
+        if storedAggressiveModePreference == nil && !forceEnabled {
+            UserDefaults.standard.set(resolvedAggressiveModeEnabled, forKey: enabledKey)
+        }
+        if chargerTestMode {
+            lastEventText = "Charger test ready"
+        } else if wakeWindowDiagnosticMode {
+            lastEventText = "Wake window diagnostic ready"
+        } else if diagnosticMode {
+            lastEventText = "Diagnostic mode ready"
+        } else {
+            lastEventText = "Ready"
+        }
     }
 
     func bootstrap() {
@@ -65,16 +95,16 @@ final class AlarmGuardController: ObservableObject {
         isAggressiveModeEnabled = enabled
 
         if enabled {
-            AlarmLog.runtime.info("aggressive mode enabled")
+            AlarmLog.runtime.info("morning guard enabled")
             startGuardLoop()
         } else {
-            AlarmLog.runtime.info("aggressive mode disabled")
+            AlarmLog.runtime.info("morning guard disabled")
             guardGeneration += 1
             guardTask?.cancel()
             guardTask = nil
             workoutAnchor.stop()
             currentPhaseText = "Idle"
-            lastEventText = "Aggressive Mode off"
+            lastEventText = "Morning Guard off"
         }
     }
 
@@ -124,16 +154,54 @@ final class AlarmGuardController: ObservableObject {
     private func runGuardLoop() async {
         AlarmLog.runtime.info("guard loop starting")
         AlarmDebugConsole.write("guard loop starting")
-        await workoutAnchor.startOrRecover()
         let calculator = AlarmScheduleCalculator(configuration: configuration, calendar: calendar)
+        let windowPolicy = AlarmGuardWindowPolicy(
+            configuration: configuration,
+            prewarmSeconds: guardWindowPrewarmSeconds,
+            cooldownSeconds: guardWindowCooldownSeconds,
+            calendar: calendar
+        )
 
         while !Task.isCancelled && isAggressiveModeEnabled {
             batteryMonitor.refresh()
 
             let now = Date()
+            guard let guardWindow = windowPolicy.currentOrNextWindow(at: now) else {
+                workoutAnchor.stop()
+                nextPhaseText = "Next: unavailable"
+                currentPhaseText = "Guard window unavailable"
+                try? await Task.sleep(nanoseconds: 60_000_000_000)
+                continue
+            }
+
+            if now < guardWindow.startDate {
+                workoutAnchor.stop()
+                nextPhaseText = "Next guard: \(formatted(guardWindow.startDate))"
+                currentPhaseText = "Armed, anchor off"
+                lastEventText = "Guard window starts \(formatted(guardWindow.startDate))"
+                AlarmLog.runtime.info("guard armed window_start=\(self.formatted(guardWindow.startDate), privacy: .public) window_end=\(self.formatted(guardWindow.endDate), privacy: .public)")
+                AlarmDebugConsole.write("guard armed window_start=\(formatted(guardWindow.startDate)) window_end=\(formatted(guardWindow.endDate))")
+                smartAlarmBridge.scheduleIfActive(at: guardWindow.startDate)
+                await sleepUntil(guardWindow.startDate)
+                continue
+            }
+
+            await workoutAnchor.startOrRecover()
+
             guard let scheduled = calculator.currentOrNextPhase(at: now) else {
                 nextPhaseText = "Next: unavailable"
                 try? await Task.sleep(nanoseconds: 60_000_000_000)
+                continue
+            }
+
+            if scheduled.startDate >= guardWindow.endDate {
+                workoutAnchor.stop()
+                currentPhaseText = "Morning guard complete"
+                nextPhaseText = "Next guard: \(formatted(windowPolicy.currentOrNextWindow(at: guardWindow.endDate)?.startDate ?? guardWindow.endDate))"
+                lastEventText = "Anchor off outside alarm window"
+                AlarmLog.runtime.info("guard window complete window_end=\(self.formatted(guardWindow.endDate), privacy: .public)")
+                AlarmDebugConsole.write("guard window complete window_end=\(formatted(guardWindow.endDate))")
+                await sleepUntil(guardWindow.endDate)
                 continue
             }
 
@@ -180,6 +248,7 @@ final class AlarmGuardController: ObservableObject {
             }
         }
 
+        workoutAnchor.stop()
         AlarmLog.runtime.info("guard loop stopped")
         AlarmDebugConsole.write("guard loop stopped")
     }
@@ -296,6 +365,10 @@ final class AlarmGuardController: ObservableObject {
         #else
         return false
         #endif
+    }
+
+    private static func shouldRunWakeWindowDiagnosticMode(environment: [String: String]) -> Bool {
+        environment["WAKE_GUARD_WINDOW_DIAGNOSTIC_MODE"] == "1"
     }
 
     private static func shouldRunChargerTestMode(environment: [String: String]) -> Bool {
