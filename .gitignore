@@ -11,6 +11,7 @@ DerivedData/
 *.xcarchive
 *.xcresult
 *.dSYM
+*.dSYM.zip
 *.ipa
 *.moved-aside
 
