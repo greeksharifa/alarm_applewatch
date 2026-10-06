@@ -18,6 +18,16 @@ Find simulator IDs with:
 xcrun simctl list devices
 ```
 
+## `verify_watch_simulator_wake_window.sh`
+
+Builds and launches the simulator wake-window diagnostic, then checks guard scheduling, all three diagnostic phase starts and completions, and the tenth pulse of the final phase.
+
+```sh
+WATCH_UDID=<sim-udid> bash scripts/verify_watch_simulator_wake_window.sh
+```
+
+The diagnostic schedules guard prewake at launch + 60s and phases at launch + 120s, +150s, and +180s. The script waits 245 seconds by default; override `WAIT_SECONDS` when needed. Simulator evidence does not replace physical Watch validation of background execution or felt haptics.
+
 ## `check_real_watch_device.sh`
 
 Checks Xcode tools, signing settings, entitlements, USB/CoreDevice visibility, destinations, and generic physical-watch build readiness.
