@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+- 절대 변경 내역, AI 말투(e.g. 왜 중요한가), 메타발언, 작업 범위 설명, 방어적인 말투(e.g. 이것은 ~가 아니다) 등을 사용하지 마라.
+
 ## Project Structure & Module Organization
 
 This repository contains a personal Apple Watch alarm app. The Xcode project lives at `alarm_applewatch.xcodeproj`. The watchOS app source is under `alarm_applewatch Watch App/`, with reusable alarm scheduling and haptic-planning logic in `alarm_applewatch Watch App/AlarmCore/`. The companion iOS app shell is in `alarm_applewatch/`. Swift package metadata in `Package.swift` exposes the `AlarmCore` library for local tests. Tests live in `Tests/AlarmCoreTests/`. Watch assets are in `alarm_applewatch Watch App/Assets.xcassets/`, operational scripts are in `scripts/`, and project documentation is in `docs/`.
@@ -24,7 +26,7 @@ Core tests use Swift Testing (`import Testing`, `@Test`, `#expect`, `#require`).
 
 ## Commit & Pull Request Guidelines
 
-The current history only shows `Initial Commit`; use concise imperative commit subjects such as `Add charger-stop validation` and keep each commit focused. Pull requests should include a short summary, validation commands and results, linked issues or docs when relevant, and screenshots or recordings for UI changes. Note simulator/device IDs, environment overrides, and any signing or provisioning assumptions.
+Use concise imperative commit subjects such as `Add charger-stop validation` and keep each commit focused. Pull requests should include a short summary, validation commands and results, linked issues or docs when relevant, and screenshots or recordings for UI changes. Note simulator/device IDs, environment overrides, and any signing or provisioning assumptions.
 
 ## Security & Configuration Tips
 
